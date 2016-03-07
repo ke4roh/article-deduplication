@@ -59,12 +59,9 @@ object DedupApp {
       case parser.likelihoodMode =>
         val mode = parser.likelihoodMode
 
-        val nBuckets = 20
-        val buckets = (0 to nBuckets).map {
-            x =>
-              x.toDouble / nBuckets.toDouble
-          }
-          .toArray
+        val jaccard = mode.jaccard()
+
+        val binWidth = mode.binWidth()
 
         val likelihoodFilename = mode.likelihoodFile()
         val duplicatesFilename = mode.duplicateSets() 
@@ -103,8 +100,20 @@ object DedupApp {
             case ((label1, vec1), (label2, vec2)) =>
               val labels = Set(label1, label2)
               val duplicate = duplicatePairsBC.value.contains(labels)
-              val binWidth = 1.0 / nBuckets
-              val dist = Vectors.sqdist(vec1, vec2)
+              val dist = if(jaccard) {
+                // Jaccard distance is equal to Euclidean distance
+                // on binary vectors, as long as we divide by max
+                // possible mismatched entries
+                val dist = math.sqrt(Vectors.sqdist(vec1, vec2))
+                // maximum distance would be if vectors' entries are
+                // disjoint
+                val maxDist = vec1.indices.size + vec2.indices.size
+                // scale to distance produced range of squared
+                // Euclidean distance to make comparisons easier
+                dist / maxDist * 2.0
+              } else {
+                Vectors.sqdist(vec1, vec2)
+              }
               val binIdx = (dist / binWidth).floor.toInt
               ((binIdx, duplicate), 1L)
           }
@@ -137,7 +146,7 @@ object DedupApp {
               .toDouble
 
               val likelihood = nDuplicated / (nDuplicated + nUnduplicated)
-              val lowerbound = binIdx.toDouble / nBuckets.toDouble
+              val lowerbound = binIdx.toDouble * binWidth
 
               (lowerbound, likelihood)
           }

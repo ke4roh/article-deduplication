@@ -14,11 +14,13 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
   }
 
   val likelihoodMode = new Subcommand("compute-likelihood") {
+    val binWidth = opt[Double](default = Some(0.05))
     val likelihoodFile = opt[String](required = true)
     val duplicateSets = opt[String](required = true)
     val binarize = opt[Boolean]()
     val tfidf = opt[Boolean]()
     val normalize = opt[Boolean]()
+    val jaccard = opt[Boolean]()
     mutuallyExclusive(tfidf, normalize)
   }
 }
