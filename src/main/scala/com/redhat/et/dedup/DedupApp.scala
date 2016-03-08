@@ -104,7 +104,7 @@ object DedupApp {
                 // Jaccard distance is equal to Euclidean distance
                 // on binary vectors, as long as we divide by max
                 // possible mismatched entries
-                val dist = math.sqrt(Vectors.sqdist(vec1, vec2))
+                val dist = Vectors.sqdist(vec1, vec2)
                 // maximum distance would be if vectors' entries are
                 // disjoint
                 val maxDist = vec1.indices.size + vec2.indices.size
