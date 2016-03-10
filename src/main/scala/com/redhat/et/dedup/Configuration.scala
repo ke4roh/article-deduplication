@@ -11,6 +11,7 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
     val articles = opt[String](required = true)
     val minWordCount = opt[Int]()
     val maxWordCount = opt[Int]()
+    val windowSize = opt[Int](default = Some(1))
   }
 
   val likelihoodMode = new Subcommand("compute-likelihood") {
@@ -22,5 +23,24 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
     val normalize = opt[Boolean]()
     val jaccard = opt[Boolean]()
     mutuallyExclusive(tfidf, normalize)
+  }
+
+  val rankingsMode = new Subcommand("rankings") {
+    val rankingsFile = opt[String](required = true)
+    val threshold = opt[Double](default = Some(0.2))
+    val binarize = opt[Boolean]()
+    val tfidf = opt[Boolean]()
+    val normalize = opt[Boolean]()
+    val jaccard = opt[Boolean]()
+    mutuallyExclusive(tfidf, normalize)
+  }
+
+  val annMode = new Subcommand("ann") {
+    val duplicateSets = opt[String](required = true)
+    val binarize = opt[Boolean]()
+    val tfidf = opt[Boolean]()
+    val normalize = opt[Boolean]()
+    val jaccard = opt[Boolean]()
+    mutuallyExclusive(tfidf, normalize)    
   }
 }

@@ -29,7 +29,8 @@ object TextCleanerFunctions {
                 replacementWords: Map[String, String],
                 articles : DataFrame,
                 minWordCounts : Option[Int],
-                maxWordCounts : Option[Int]) : RDD[(Long, Seq[String])] = {
+                maxWordCounts : Option[Int],
+                windowSize : Int) : RDD[(Long, Seq[String])] = {
 
     val sc = articles.sqlContext.sparkContext
 
@@ -55,6 +56,8 @@ object TextCleanerFunctions {
            .filter( s => Try(java.lang.Long.parseLong(s.toUpperCase, 16)).isFailure)
            .filter( s => !s.startsWith("0x") )
            .filter( s => !s.startsWith("ffff") )
+           .sliding( windowSize )
+           .map { shingle => shingle.mkString(",") }
            .toSeq
          )
       }
@@ -154,11 +157,13 @@ class TextCleaner(filteredWords : Set[String],
                   replacementWords: Map[String, String],
                   articles : DataFrame,
                   minWordCounts : Option[Int],
-                  maxWordCounts : Option[Int]) {
+                  maxWordCounts : Option[Int],
+                  windowSize : Int) {
 
   lazy val cleanedText : RDD[(Long, Seq[String])] = {
     TextCleanerFunctions.cleanText(filteredWords, replacementWords,
-                                   articles, minWordCounts, maxWordCounts)
+                                   articles, minWordCounts, maxWordCounts,
+                                   windowSize)
 
   }
 
@@ -174,13 +179,15 @@ object TextCleaner {
             replacementWordsFilename : String,
             articlesFilename : String,
             minWordCounts : Option[Int],
-            maxWordCounts : Option[Int]) : TextCleaner = {
+            maxWordCounts : Option[Int],
+            windowSize : Int) : TextCleaner = {
     val (filteredWords, replacementWords) = IOUtils.readJSON(filteredWordsFilename,
                                                              replacementWordsFilename)
 
     val sql = new SQLContext(sc)
     val articles = sql.jsonFile(articlesFilename).cache()
 
-    new TextCleaner(filteredWords, replacementWords, articles, minWordCounts, maxWordCounts)
+    new TextCleaner(filteredWords, replacementWords, articles, minWordCounts, maxWordCounts,
+                  windowSize)
   }
 }

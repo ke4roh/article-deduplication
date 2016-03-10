@@ -18,6 +18,8 @@ libraryDependencies += "org.apache.spark" %% "spark-sql" % SPARK_VERSION % "prov
 
 libraryDependencies += "org.apache.spark" %% "spark-mllib" % SPARK_VERSION % "provided"
 
+libraryDependencies += "com.github.karlhigley" %% "spark-neighbors" % "0.2.0-SNAPSHOT"
+
 libraryDependencies += "com.redhat.et" %% "silex" % "0.0.8"
 
 libraryDependencies += "org.json4s" %% "json4s-native" % "3.3.0"
