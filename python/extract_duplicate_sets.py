@@ -27,12 +27,11 @@ def extract_duplicates(query_results):
     duplicate_sets = defaultdict(set)
     
     for doc in query_results["response"]["docs"]:
-        id = doc["entity_id"]
-        
+        id = str(doc["entity_id"])
         
         duplicate_sets[id].add(id)
         for duplicate_of in doc["tm_field_dupe_of"]:
-            duplicate_sets[id].add(duplicate_of)
+            duplicate_sets[id].add(str(duplicate_of))
 
     return duplicate_sets.values()
 
