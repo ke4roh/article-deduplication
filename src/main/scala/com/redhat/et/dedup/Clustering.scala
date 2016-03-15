@@ -4,7 +4,7 @@ import org.apache.spark._
 import org.apache.spark.SparkContext._
 import org.apache.spark.rdd._
 
-import org.apache.spark.mllib.linalg.{Vector => SparkVector, SparseVector}
+import org.apache.spark.mllib.linalg.{Vector => SparkVector, SparseVector, Vectors}
 import org.apache.spark.mllib.clustering.KMeans
 
 case class ClusterMetrics(inertia : SparseVector)
@@ -30,6 +30,87 @@ class ClusterModel(val nClusters : Int,
 
     new FeatureMatrix(labeledVectors,
                       featureLabels)
+  }
+}
+
+case class KCentersModel(val nCenters : Int,
+                         val centers: Vector[(Int, SparseVector)]) {
+
+  def assign(featureMatrix : FeatureMatrix) : FeatureMatrix = {
+
+    val sc = featureMatrix.labeledVectors.context
+    val centersBC = sc.broadcast(centers)
+
+    val assignedVectors = featureMatrix.labeledVectors
+      .map {
+        case (label, vector) =>
+          val (assignIdx, _) = centersBC.value.minBy {
+            case (centerIdx, center) =>
+              math.sqrt(Vectors.sqdist(vector, center))
+          }
+          
+          (label, new SparseVector(nCenters, Array(assignIdx), Array(1.0)))
+    }
+
+    new FeatureMatrix(assignedVectors,
+                      featureMatrix.featureLabels)
+  }
+}
+
+object KCenters {
+
+  def train(maxRadius : Double, featureMatrix : FeatureMatrix) : KCentersModel = {
+    var vectors = featureMatrix.labeledVectors
+      .map {
+        case (label, vec) =>
+          (label, vec, java.lang.Double.POSITIVE_INFINITY)
+      }
+      .persist()
+
+    var radius = java.lang.Double.POSITIVE_INFINITY
+    var currentCenter = vectors.takeSample(false, 1)(0) match {
+      case (label, vec, dist) =>
+        (0, vec)
+    }
+    var centers = Vector[(Int, SparseVector)]()
+
+    var i = 1
+    while (radius > maxRadius) {
+      val (centerIdx, center) = currentCenter
+      val updatedVectors = vectors.map {
+        case (label, vec, assignDist) =>
+          val newDist = math.sqrt(Vectors.sqdist(center, vec))
+          (label, vec, math.min(newDist, assignDist))
+      }
+      .persist()
+
+      if (i % 100 == 0) {
+        updatedVectors.checkpoint()
+      }
+
+      vectors.unpersist()
+      
+      val (_, newCenter, newRadius) = updatedVectors.reduce {
+        case ((label1, vec1, assignDist1),
+              (label2, vec2, assignDist2)) =>
+          if (assignDist1 > assignDist2) {
+            (label1, vec1, assignDist1)
+          } else {
+            (label2, vec2, assignDist2)
+          }
+      }
+
+      println(i.toString + ", Radius: " + newRadius)
+
+      vectors = updatedVectors
+      centers = centers :+ currentCenter
+      currentCenter = (centerIdx + 1, newCenter)
+      radius = newRadius
+      i += 1
+    }
+
+    new KCentersModel(centers.size,
+                      centers)
   }
 }
 

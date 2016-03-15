@@ -1,9 +1,66 @@
 package com.redhat.et.dedup
 
 import org.apache.spark.rdd._
-import org.apache.spark.mllib.linalg.{Vector => SparkVector, SparseVector}
+import org.apache.spark.mllib.linalg.{Vector => SparkVector, SparseVector, Vectors}
 
 import org.scalatest._
+
+import scala.util.Random
+
+class KCentersSpec extends FlatSpec with Matchers with PerTestSparkContext {
+  "KCenters.train" should "generate 3 clusters with radius < 5" in {
+    val maxRadius = 5.0
+    val centers = List((1.0, 1.0, 1.0),
+                       (10.0, 10.0, 10.0),
+                       (-10.0, -10.0, -10.0))
+
+    val rng = new Random()
+    val std = 0.1
+    val points = centers.flatMap {
+      case (x, y, z) =>
+        (1 to 10).map {
+            case _ =>
+              (x + std * rng.nextGaussian(),
+               y + std * rng.nextGaussian(),
+               z + std * rng.nextGaussian())
+        }
+    }
+    .map {
+      case (x, y, z) =>
+        new SparseVector(3, Array(0, 1, 2), Array(x, y, z))
+    }
+    .zipWithIndex
+    .map {
+      case (vec, label) =>
+        (label.toString, vec)
+    }
+
+    val featureLabels = List((0, "x"),
+                             (1, "y"),
+                             (2, "z"))
+
+    val featureMatrix = new FeatureMatrix(context.parallelize(points),
+                                          context.parallelize(featureLabels))
+
+    val model = KCenters.train(maxRadius, featureMatrix)
+    val assignments = model.assign(featureMatrix)
+
+    println(model.centers.toList)
+    assert(model.centers.size === 3)
+
+    model.centers
+      .combinations(2)
+      .map {
+        iter =>
+          val array = iter.take(2)
+          val center1 = array(0)._2
+          val center2 = array(1)._2
+          val distance = math.sqrt(Vectors.sqdist(center1, center2))
+
+          assert(distance < maxRadius)
+    }
+  }
+}
 
 class ClusteringSpec extends FlatSpec with Matchers with PerTestSparkContext {
   "ClusterModel.toFeatureMatrix" should "return FeatureMatrix" in {
