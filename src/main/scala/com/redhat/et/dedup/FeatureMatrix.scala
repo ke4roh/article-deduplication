@@ -143,6 +143,7 @@ private[dedup] case class SparkContextWithLoadFeatureMatrix(sc : SparkContext) {
           val cols = line.split("\t")
           (cols(0).toInt, cols(1))
       }
+      .repartition(sc.defaultParallelism)
 
     val nFeatures = featureLabels.count().toInt
 
@@ -167,6 +168,7 @@ private[dedup] case class SparkContextWithLoadFeatureMatrix(sc : SparkContext) {
         case (idx, (label, vec)) =>
           (label, vec)
       }
+      .repartition(sc.defaultParallelism)
 
     new FeatureMatrix(labeledVectors, featureLabels)
   }
