@@ -17,6 +17,7 @@ import com.redhat.et.dedup.FeatureMatrixSparkContext.implicits._
 import com.github.karlhigley.spark.neighbors.ANN
 
 import java.io._
+import java.nio.file._
 
 object DedupFunctions {
   def distance(vec1 : SparseVector, vec2 : SparseVector, jaccard : Boolean) : Double = {
@@ -49,10 +50,13 @@ object DedupApp {
     Logger.getLogger("org").setLevel(Level.WARN)
     Logger.getLogger("parquet").setLevel(Level.WARN)
     val conf = new SparkConf()
-      .setAppName("Optics App")
+      .setAppName("Dedup App")
       .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
 
     val sc = new SparkContext(conf)
+    val checkpointPath = Files.createTempDirectory("dedup")
+    checkpointPath.toFile.deleteOnExit()
+    sc.setCheckpointDir(checkpointPath.toString)
 
     val workDir = parser.workDir()
 
@@ -169,7 +173,7 @@ object DedupApp {
                 0.0
               }
 
-              val likelihood = nDuplicated / (nDuplicated + nUnduplicated)
+              val likelihood = nDuplicated + nUnduplicated
               val lowerbound = binIdx.toDouble * binWidth
 
               (lowerbound, likelihood)
@@ -291,7 +295,6 @@ object DedupApp {
         }
 
         val labeledVectors = scaledWordCounts.labeledVectors
-          .repartition(sc.defaultParallelism)
 
         val likelihood = labeledVectors.cartesian(labeledVectors)
           .filter {
@@ -317,6 +320,140 @@ object DedupApp {
         
         val pw = new PrintWriter(rankingsFilename)
         likelihood.map {
+          case ((label1, label2), dist) =>
+            pw.print(label1)
+            pw.print("\t")
+            pw.print(label2)
+            pw.print("\t")
+            pw.println(dist)
+        }
+        pw.close()
+
+     case parser.approxRankingsMode =>
+        val mode = parser.approxRankingsMode
+
+        val jaccard = mode.jaccard()
+        val rankingsFilename = mode.rankingsFile()
+        val threshold = mode.threshold()
+
+        val wordCounts = sc.featureMatrix(workDir + "/documents")
+        
+        val binarizedWordCounts = if (mode.binarize()) {
+          wordCounts.binarize()
+        } else {
+          wordCounts
+        }
+
+        val scaledWordCounts = if (mode.tfidf()) {
+          binarizedWordCounts.tfidf()
+        } else if (mode.normalize()) {
+          binarizedWordCounts.normalizeL2()
+        } else {
+          binarizedWordCounts
+        }
+
+        val labeledVectors = scaledWordCounts.labeledVectors
+
+        val clusters = KCenters.train(math.sqrt(threshold) / 3.0, scaledWordCounts)
+
+        val clusterSamples = clusters.assign(scaledWordCounts)
+          .labeledVectors
+          .map {
+            case (label, assignmentVec) =>
+              (label, assignmentVec.indices(0))
+          }
+          .join(scaledWordCounts.labeledVectors)
+          .map {
+            case (label, (assignmentIdx, vec)) =>
+              (assignmentIdx, (label, vec))
+          }
+          .groupByKey()
+          .persist()
+
+        val interCluster = clusterSamples.flatMap {
+          case (label, ptsIter) =>
+            ptsIter.toSeq
+              .combinations(2)
+              .filter {
+                pair => 
+                  val array = pair.take(2)
+                  val (label1, vec1) = array(0)
+                  val (label2, vec2) = array(1)
+
+                  label1 != label2 &&
+                    label1.toInt < label2.toInt
+              }
+              .map {
+                pair =>
+                  val array = pair.take(2)
+                  val (label1, vec1) = array(0)
+                  val (label2, vec2) = array(1)
+                  val dist = DedupFunctions.distance(vec1, vec2, jaccard)
+                  ((label1, label2), dist)
+              }
+        }
+
+        val clusterPairs = clusters.centers
+          .combinations(2)
+          .map {
+            pair =>
+              val array = pair.take(2)
+              
+              (array(0), array(1))
+          }
+          .filter {
+            case ((centerIdx1, center1), (centerIdx2, center2)) =>
+              // prevent computing cluster pairs twice -- we already computed clusters with themselves
+              centerIdx1 < centerIdx2 && DedupFunctions.distance(center1, center2, jaccard) < threshold
+          }
+          .map {
+            case ((centerIdx1, center1), (centerIdx2, center2)) =>
+              (centerIdx1, centerIdx2)
+          }
+          .toSet
+
+        val clusterPairsBC = sc.broadcast(clusterPairs)
+
+        val intraCluster = clusterSamples.cartesian(clusterSamples)
+          .filter {
+            case ((clusterIdx1, labeledVectors1),
+                  (clusterIdx2, labeledVectors2)) =>
+
+              val clusterPairs = clusterPairsBC.value
+
+              clusterPairs.contains((clusterIdx1, clusterIdx2))
+          }
+          .flatMap {
+            case ((clusterIdx1, labeledVectors1),
+                  (clusterIdx2, labeledVectors2)) =>
+
+              labeledVectors1.flatMap {
+                case (label1, vec1) =>
+                  labeledVectors2.filter {
+                      case (label2, vec2) =>
+                        label1.toInt < label2.toInt
+                  }
+                  .map {
+                    case (label2, vec2) =>
+                      val dist = DedupFunctions.distance(vec1, vec2, jaccard)
+                      ((label1, label2), dist)
+                  }
+              }
+        }
+
+        val allPairs = interCluster.union(intraCluster)
+          .filter {
+            case (labels, dist) =>
+              dist < threshold
+          }
+          .sortBy { 
+            case (labels, dist) =>
+              dist
+          }
+          .collect()
+        
+        val pw = new PrintWriter(rankingsFilename)
+        allPairs.map {
           case ((label1, label2), dist) =>
             pw.print(label1)
             pw.print("\t")
