@@ -44,7 +44,9 @@ object DedupApp {
   val DUPLICATE = 0
   val NOT_DUPLICATE = 1
 
-  def histogram(workDir : String, histogramFilename : String, binWidth : Double, binarize : Boolean, tfidf : Boolean, normalize : Boolean, jaccard : Boolean, sc : SparkContext) = {
+  def getWordCounts(workDir : String, binarize : Boolean, tfidf : Boolean,
+                    normalize : Boolean, sc : SparkContext) : FeatureMatrix = {
+
     val wordCounts = sc.featureMatrix(workDir + "/documents")
         
     val binarizedWordCounts = if (binarize) {
@@ -64,6 +66,11 @@ object DedupApp {
     } else {
       tfidfWordCounts
     }
+
+    scaledWordCounts
+  }
+
+  def histogram(workDir : String, scaledWordCounts : FeatureMatrix, histogramFilename : String, binWidth : Double, jaccard : Boolean) = {
     
     val labeledVectors = scaledWordCounts.labeledVectors
       .cache()
@@ -92,29 +99,9 @@ object DedupApp {
       pw.close()
   }
 
-  def likelihood(workDir : String, likelihoodFilename : String, duplicatesFilename : String, binWidth : Double, binarize : Boolean, tfidf : Boolean, normalize : Boolean, jaccard : Boolean, sc : SparkContext) = {
+  def likelihood(workDir : String, scaledWordCounts : FeatureMatrix, likelihoodFilename : String, duplicatesFilename : String, binWidth : Double, jaccard : Boolean) = {
+
     val duplicateSets = IOFuncs.readDuplicateSets(duplicatesFilename)
-
-    val wordCounts = sc.featureMatrix(workDir + "/documents")
-
-    val binarizedWordCounts = if (binarize) {
-      wordCounts.binarize()
-    } else {
-      wordCounts
-    }
-    
-    val tfidfWordCounts = if (tfidf) {
-      binarizedWordCounts.tfidf()
-    } else {
-      binarizedWordCounts
-    }
-
-    val scaledWordCounts = if (normalize) {
-      tfidfWordCounts.normalizeL2()
-    } else {
-      tfidfWordCounts
-    }
-    
     val duplicatePairs = duplicateSets.flatMap {
       case duplicateSet =>
         duplicateSet.combinations(2)
@@ -122,7 +109,9 @@ object DedupApp {
       }
       .toSet
 
-    val duplicatePairsBC = sc.broadcast(duplicatePairs)
+    val duplicatePairsBC = scaledWordCounts.labeledVectors
+      .context
+      .broadcast(duplicatePairs)
 
     val labeledVectors = scaledWordCounts.labeledVectors
       .cache()
@@ -195,26 +184,7 @@ object DedupApp {
     pw.close()
   }
 
-  def rankings(workDir : String, rankingsFilename : String, threshold : Double, binarize : Boolean, tfidf : Boolean, normalize : Boolean, jaccard : Boolean, sc : SparkContext) = {
-    val wordCounts = sc.featureMatrix(workDir + "/documents")
-
-    val binarizedWordCounts = if (binarize) {
-      wordCounts.binarize()
-    } else {
-      wordCounts
-    }
-    
-    val tfidfWordCounts = if (tfidf) {
-      binarizedWordCounts.tfidf()
-    } else {
-      binarizedWordCounts
-    }
-
-    val scaledWordCounts = if (normalize) {
-      tfidfWordCounts.normalizeL2()
-    } else {
-      tfidfWordCounts
-    }
+  def rankings(workDir : String, scaledWordCounts : FeatureMatrix, rankingsFilename : String, threshold : Double, jaccard : Boolean) = {
     
     val labeledVectors = scaledWordCounts.labeledVectors
       .cache()
@@ -296,23 +266,29 @@ object DedupApp {
         val likelihoodFilename = mode.likelihoodFile()
         val duplicatesFilename = mode.duplicateSets() 
 
-        likelihood(workDir, likelihoodFilename, duplicatesFilename, mode.binWidth(),
-                   mode.binarize(), mode.tfidf(), mode.normalize(), mode.jaccard(), sc)
+        val scaledWordCounts = getWordCounts(workDir, mode.binarize(), mode.tfidf(), mode.normalize(), sc)
+
+        likelihood(workDir, scaledWordCounts, likelihoodFilename, duplicatesFilename,
+                   mode.binWidth(), mode.jaccard())
 
       case parser.histogramMode =>
         val mode = parser.histogramMode
 
         val histogramFilename = mode.histogramFile()
+        
+        val scaledWordCounts = getWordCounts(workDir, mode.binarize(), mode.tfidf(), mode.normalize(), sc)
 
-        histogram(workDir, histogramFilename, mode.binWidth(), mode.binarize(),
-                  mode.tfidf(), mode.normalize(), mode.jaccard(), sc)
+        histogram(workDir, scaledWordCounts, histogramFilename, mode.binWidth(),
+                  mode.jaccard())
 
       case parser.rankingsMode =>
         val mode = parser.rankingsMode
 
         val rankingsFilename = mode.rankingsFile()
 
-        rankings(workDir, rankingsFilename, mode.threshold(), mode.binarize(), mode.tfidf(), mode.normalize(), mode.jaccard(), sc)
+        val scaledWordCounts = getWordCounts(workDir, mode.binarize(), mode.tfidf(), mode.normalize(), sc)
+
+        rankings(workDir, scaledWordCounts, rankingsFilename, mode.threshold(), mode.jaccard())
 
       case parser.annMode =>
         val mode = parser.annMode
@@ -320,25 +296,7 @@ object DedupApp {
         val duplicatesFilename = mode.duplicateSets() 
         val duplicateSets = IOFuncs.readDuplicateSets(duplicatesFilename)
 
-        val wordCounts = sc.featureMatrix(workDir + "/documents")
-
-        val binarizedWordCounts = if (mode.binarize()) {
-          wordCounts.binarize()
-        } else {
-          wordCounts
-        }
-    
-        val tfidfWordCounts = if (mode.tfidf()) {
-          binarizedWordCounts.tfidf()
-        } else {
-          binarizedWordCounts
-        }
-
-        val scaledWordCounts = if (mode.normalize()) {
-          tfidfWordCounts.normalizeL2()
-        } else {
-          tfidfWordCounts
-        }
+        val scaledWordCounts = getWordCounts(workDir, mode.binarize(), mode.tfidf(), mode.normalize(), sc)
 
         val duplicatePairs = duplicateSets.flatMap {
           case duplicateSet =>
