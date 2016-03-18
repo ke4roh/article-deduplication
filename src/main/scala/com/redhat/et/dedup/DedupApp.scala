@@ -78,7 +78,7 @@ object DedupApp {
       .reduceByKey(_+_)
       .collect()
         
-      val pw = new PrintWriter(histogramFilename)
+      val pw = new PrintWriter(workDir + "/" + histogramFilename)
       histogram.map {
         case (lowerbound, counts) =>
           pw.print(lowerbound)
@@ -177,7 +177,7 @@ object DedupApp {
       }
       .collect()
 
-    val pw = new PrintWriter(likelihoodFilename)
+    val pw = new PrintWriter(workDir + "/" + likelihoodFilename)
     likelihood.map {
       case (lowerbound, likelihood) =>
         pw.print(lowerbound)
@@ -370,7 +370,7 @@ object DedupApp {
               dist
           }
         
-        val pw = new PrintWriter(rankingsFilename)
+        val pw = new PrintWriter(workDir + "/" + rankingsFilename)
         distances.map {
           case ((label1, label2), dist) =>
             pw.print(label1)
