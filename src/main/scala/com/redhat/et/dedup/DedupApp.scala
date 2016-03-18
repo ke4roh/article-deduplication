@@ -44,6 +44,149 @@ object DedupApp {
   val DUPLICATE = 0
   val NOT_DUPLICATE = 1
 
+  def histogram(workDir : String, histogramFilename : String, binWidth : Double, binarize : Boolean, tfidf : Boolean, normalize : Boolean, jaccard : Boolean, sc : SparkContext) = {
+    val wordCounts = sc.featureMatrix(workDir + "/documents")
+        
+    val binarizedWordCounts = if (binarize) {
+      wordCounts.binarize()
+    } else {
+      wordCounts
+    }
+    
+    val scaledWordCounts = if (tfidf) {
+      binarizedWordCounts.tfidf()
+    } else if (normalize) {
+      binarizedWordCounts.normalizeL2()
+    } else {
+      binarizedWordCounts
+    }
+    
+    val labeledVectors = scaledWordCounts.labeledVectors
+      .cache()
+    
+    val histogram = labeledVectors.cartesian(labeledVectors)
+      .filter {
+        case ((label1, vec1), (label2, vec2)) =>
+          label1 != label2 && label1.toInt < label2.toInt
+      }
+      .map {
+        case ((label1, vec1), (label2, vec2)) =>
+          val dist = DedupFunctions.distance(vec1, vec2, jaccard)
+          val lowerbound = (dist / binWidth).floor * binWidth
+          (lowerbound, 1L)
+      }
+      .reduceByKey(_+_)
+      .collect()
+        
+      val pw = new PrintWriter(histogramFilename)
+      histogram.map {
+        case (lowerbound, counts) =>
+          pw.print(lowerbound)
+          pw.print("\t")
+          pw.println(counts)
+      }
+      pw.close()
+  }
+
+  def likelihood(workDir : String, likelihoodFilename : String, duplicatesFilename : String, binWidth : Double, binarize : Boolean, tfidf : Boolean, normalize : Boolean, jaccard : Boolean, sc : SparkContext) = {
+    val duplicateSets = IOFuncs.readDuplicateSets(duplicatesFilename)
+
+    val wordCounts = sc.featureMatrix(workDir + "/documents")
+        
+    val binarizedWordCounts = if (binarize) {
+      wordCounts.binarize()
+    } else {
+      wordCounts
+    }
+
+    val scaledWordCounts = if (tfidf) {
+      binarizedWordCounts.tfidf()
+    } else if (normalize) {
+      binarizedWordCounts.normalizeL2()
+    } else {
+      binarizedWordCounts
+    }
+    
+    val duplicatePairs = duplicateSets.flatMap {
+      case duplicateSet =>
+        duplicateSet.combinations(2)
+          .map(_.toSet)
+      }
+      .toSet
+
+    val duplicatePairsBC = sc.broadcast(duplicatePairs)
+
+    val labeledVectors = scaledWordCounts.labeledVectors
+      .cache()
+
+    val likelihood = labeledVectors.cartesian(labeledVectors)
+      .filter {
+        case ((label1, vec1), (label2, vec2)) =>
+          label1 != label2 && label1.toInt < label2.toInt
+      }
+      .map {
+        case ((label1, vec1), (label2, vec2)) =>
+          val labels = Set(label1, label2)
+          val duplicate = duplicatePairsBC.value.contains(labels)
+          val dist = DedupFunctions.distance(vec1, vec2, jaccard)
+          val binIdx = (dist / binWidth).floor.toInt
+          ((binIdx, duplicate), 1L)
+      }
+      .reduceByKey(_+_)
+      .map {
+        case ((binIdx, duplicate), counts) =>
+          (binIdx, (duplicate, counts))
+      }
+      .groupByKey()
+      .map {
+        case (binIdx, iter) =>
+          // Due to the reduceByKey, we should only have
+          // two values for the bin: duplicates and non-duplicates
+          val nDuplicatedArray = iter.filter {
+            case (duplicate, counts) =>
+              duplicate
+          }
+          .map(_._2)
+          .toArray
+
+          val nDuplicated = if (nDuplicatedArray.size > 0) {
+            nDuplicatedArray.head
+              .toDouble
+          } else {
+            0.0
+          }
+
+          val nUnduplicatedArray = iter.filter {
+            case (duplicate, counts) =>
+              !duplicate
+          }
+          .map(_._2)
+          .toArray
+
+          val nUnduplicated = if (nUnduplicatedArray.size > 0) {
+            nUnduplicatedArray.head
+              .toDouble
+          } else {
+            0.0
+          }
+
+          val likelihood = nDuplicated / (nDuplicated + nUnduplicated)
+          val lowerbound = binIdx.toDouble * binWidth
+
+          (lowerbound, likelihood)
+      }
+      .collect()
+
+    val pw = new PrintWriter(likelihoodFilename)
+    likelihood.map {
+      case (lowerbound, likelihood) =>
+        pw.print(lowerbound)
+        pw.print("\t")
+        pw.println(likelihood)
+    }
+    pw.close()
+  }
+  
   def main(args: Array[String]) {
     val parser = new Conf(args)
 
@@ -86,109 +229,19 @@ object DedupApp {
       case parser.likelihoodMode =>
         val mode = parser.likelihoodMode
 
-        val jaccard = mode.jaccard()
-
-        val binWidth = mode.binWidth()
-
         val likelihoodFilename = mode.likelihoodFile()
         val duplicatesFilename = mode.duplicateSets() 
-        val duplicateSets = IOFuncs.readDuplicateSets(duplicatesFilename)
 
-        val wordCounts = sc.featureMatrix(workDir + "/documents")
-        
-        val binarizedWordCounts = if (mode.binarize()) {
-          wordCounts.binarize()
-        } else {
-          wordCounts
-        }
+        likelihood(workDir, likelihoodFilename, duplicatesFilename, mode.binWidth(),
+                   mode.binarize(), mode.tfidf(), mode.normalize(), mode.jaccard(), sc)
 
-        val scaledWordCounts = if (mode.tfidf()) {
-          binarizedWordCounts.tfidf()
-        } else if (mode.normalize()) {
-          binarizedWordCounts.normalizeL2()
-        } else {
-          binarizedWordCounts
-        }
+      case parser.histogramMode =>
+        val mode = parser.histogramMode
 
-        val duplicatePairs = duplicateSets.flatMap {
-          case duplicateSet =>
-            duplicateSet.combinations(2)
-              .map(_.toSet)
-          }
-          .toSet
+        val histogramFilename = mode.histogramFile()
 
-        val duplicatePairsBC = sc.broadcast(duplicatePairs)
-
-        val labeledVectors = scaledWordCounts.labeledVectors
-          .cache()
-
-        val likelihood = labeledVectors.cartesian(labeledVectors)
-          .filter {
-            case ((label1, vec1), (label2, vec2)) =>
-              label1 != label2 && label1.toInt < label2.toInt
-          }
-          .map {
-            case ((label1, vec1), (label2, vec2)) =>
-              val labels = Set(label1, label2)
-              val duplicate = duplicatePairsBC.value.contains(labels)
-              val dist = DedupFunctions.distance(vec1, vec2, jaccard)
-              val binIdx = (dist / binWidth).floor.toInt
-              ((binIdx, duplicate), 1L)
-          }
-          .reduceByKey(_+_)
-          .map {
-            case ((binIdx, duplicate), counts) =>
-              (binIdx, (duplicate, counts))
-          }
-          .groupByKey()
-          .map {
-            case (binIdx, iter) =>
-              // Due to the reduceByKey, we should only have
-              // two values for the bin: duplicates and non-duplicates
-              val nDuplicatedArray = iter.filter {
-                case (duplicate, counts) =>
-                  duplicate
-              }
-              .map(_._2)
-              .toArray
-
-              val nDuplicated = if (nDuplicatedArray.size > 0) {
-                nDuplicatedArray.head
-                  .toDouble
-              } else {
-                0.0
-              }
-
-              val nUnduplicatedArray = iter.filter {
-                case (duplicate, counts) =>
-                  !duplicate
-              }
-              .map(_._2)
-              .toArray
-
-              val nUnduplicated = if (nUnduplicatedArray.size > 0) {
-                nUnduplicatedArray.head
-                  .toDouble
-              } else {
-                0.0
-              }
-
-              val likelihood = nDuplicated + nUnduplicated
-              val lowerbound = binIdx.toDouble * binWidth
-
-              (lowerbound, likelihood)
-          }
-          .collect()
-        
-        val pw = new PrintWriter(likelihoodFilename)
-        likelihood.map {
-            case (lowerbound, likelihood) =>
-            pw.print(lowerbound)
-            pw.print("\t")
-            pw.println(likelihood)
-          }
-        pw.close()
-
+        histogram(workDir, histogramFilename, mode.binWidth(), mode.binarize(),
+                  mode.tfidf(), mode.normalize(), mode.jaccard(), sc)
 
       case parser.annMode =>
         val mode = parser.annMode
