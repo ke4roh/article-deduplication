@@ -139,7 +139,7 @@ class FeatureMatrixSpec extends FlatSpec with Matchers with PerTestSparkContext 
 
     tfidfVectors.map {
       case (label, vec) =>
-        assert(Vectors.norm(vec, 2.0) === 1.0)
+        assert(vec.values.toSet === Set(0.8472978603872037))
     }
   }
 

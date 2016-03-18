@@ -53,12 +53,16 @@ object DedupApp {
       wordCounts
     }
     
-    val scaledWordCounts = if (tfidf) {
+    val tfidfWordCounts = if (tfidf) {
       binarizedWordCounts.tfidf()
-    } else if (normalize) {
-      binarizedWordCounts.normalizeL2()
     } else {
       binarizedWordCounts
+    }
+
+    val scaledWordCounts = if (normalize) {
+      tfidfWordCounts.normalizeL2()
+    } else {
+      tfidfWordCounts
     }
     
     val labeledVectors = scaledWordCounts.labeledVectors
@@ -92,19 +96,23 @@ object DedupApp {
     val duplicateSets = IOFuncs.readDuplicateSets(duplicatesFilename)
 
     val wordCounts = sc.featureMatrix(workDir + "/documents")
-        
+
     val binarizedWordCounts = if (binarize) {
       wordCounts.binarize()
     } else {
       wordCounts
     }
-
-    val scaledWordCounts = if (tfidf) {
+    
+    val tfidfWordCounts = if (tfidf) {
       binarizedWordCounts.tfidf()
-    } else if (normalize) {
-      binarizedWordCounts.normalizeL2()
     } else {
       binarizedWordCounts
+    }
+
+    val scaledWordCounts = if (normalize) {
+      tfidfWordCounts.normalizeL2()
+    } else {
+      tfidfWordCounts
     }
     
     val duplicatePairs = duplicateSets.flatMap {
@@ -189,21 +197,25 @@ object DedupApp {
 
   def rankings(workDir : String, rankingsFilename : String, threshold : Double, binarize : Boolean, tfidf : Boolean, normalize : Boolean, jaccard : Boolean, sc : SparkContext) = {
     val wordCounts = sc.featureMatrix(workDir + "/documents")
-        
+
     val binarizedWordCounts = if (binarize) {
       wordCounts.binarize()
     } else {
       wordCounts
     }
-
-    val scaledWordCounts = if (tfidf) {
+    
+    val tfidfWordCounts = if (tfidf) {
       binarizedWordCounts.tfidf()
-    } else if (normalize) {  
-      binarizedWordCounts.normalizeL2()
     } else {
       binarizedWordCounts
     }
 
+    val scaledWordCounts = if (normalize) {
+      tfidfWordCounts.normalizeL2()
+    } else {
+      tfidfWordCounts
+    }
+    
     val labeledVectors = scaledWordCounts.labeledVectors
       .cache()
 
@@ -309,19 +321,23 @@ object DedupApp {
         val duplicateSets = IOFuncs.readDuplicateSets(duplicatesFilename)
 
         val wordCounts = sc.featureMatrix(workDir + "/documents")
-        
+
         val binarizedWordCounts = if (mode.binarize()) {
           wordCounts.binarize()
         } else {
           wordCounts
         }
-
-        val scaledWordCounts = if (mode.tfidf()) {
+    
+        val tfidfWordCounts = if (mode.tfidf()) {
           binarizedWordCounts.tfidf()
-        } else if (mode.normalize()) {
-          binarizedWordCounts.normalizeL2()
         } else {
           binarizedWordCounts
+        }
+
+        val scaledWordCounts = if (mode.normalize()) {
+          tfidfWordCounts.normalizeL2()
+        } else {
+          tfidfWordCounts
         }
 
         val duplicatePairs = duplicateSets.flatMap {
@@ -382,8 +398,6 @@ object DedupApp {
         println(neighbors)
         println("Precision: " + prec)
         println("Recall: " + recall)
-
-       
 
       case _ =>
         System.out.println("Need to specify a mode.")

@@ -64,7 +64,7 @@ class FeatureMatrix(val labeledVectors: RDD[(String, SparseVector)],
     val tfidfVectors = model.transform(vectors)
       .map {
         case vec =>
-          VectorOps.normalize(vec.toSparse, 2.0)
+          vec.toSparse
       }
 
     val labeledTfidf = labels.zip(tfidfVectors)

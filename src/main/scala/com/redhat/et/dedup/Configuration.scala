@@ -22,7 +22,6 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
     val tfidf = opt[Boolean]()
     val normalize = opt[Boolean]()
     val jaccard = opt[Boolean]()
-    mutuallyExclusive(tfidf, normalize)
   }
 
   val histogramMode = new Subcommand("histogram") {
@@ -32,7 +31,6 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
     val tfidf = opt[Boolean]()
     val normalize = opt[Boolean]()
     val jaccard = opt[Boolean]()
-    mutuallyExclusive(tfidf, normalize)
   }
 
   val rankingsMode = new Subcommand("rankings") {
@@ -42,7 +40,6 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
     val tfidf = opt[Boolean]()
     val normalize = opt[Boolean]()
     val jaccard = opt[Boolean]()
-    mutuallyExclusive(tfidf, normalize)
   }
 
   val annMode = new Subcommand("ann") {
@@ -51,6 +48,5 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
     val tfidf = opt[Boolean]()
     val normalize = opt[Boolean]()
     val jaccard = opt[Boolean]()
-    mutuallyExclusive(tfidf, normalize)    
   }
 }
