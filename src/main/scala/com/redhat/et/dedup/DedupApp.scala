@@ -120,7 +120,7 @@ object DedupApp {
         val duplicatePairsBC = sc.broadcast(duplicatePairs)
 
         val labeledVectors = scaledWordCounts.labeledVectors
-          .repartition(sc.defaultParallelism)
+          .cache()
 
         val likelihood = labeledVectors.cartesian(labeledVectors)
           .filter {
@@ -295,31 +295,30 @@ object DedupApp {
         }
 
         val labeledVectors = scaledWordCounts.labeledVectors
+          .cache()
 
-        val likelihood = labeledVectors.cartesian(labeledVectors)
+        val distances = labeledVectors.cartesian(labeledVectors)
           .filter {
             case ((label1, vec1), (label2, vec2)) =>
-              label1 != label2 && label1.toInt < label2.toInt
+              label1 != label2 && label1.toInt < label2.toInt 
           }
-          .filter {
-            case ((label1, vec1), (label2, vec2)) =>
-              DedupFunctions.distance(vec1, vec2, jaccard) < threshold
-          }
-          // faster to recompute distance on the pairs that pass the filter
-          // since doing the filter afterwards touches ever pair again
           .map {
             case ((label1, vec1), (label2, vec2)) =>
               val dist = DedupFunctions.distance(vec1, vec2, jaccard)
               ((label1, label2), dist)
           }
+          .filter {
+            case (labels, dist) =>
+              dist < threshold
+          }
+          .collect()
           .sortBy { 
             case (labels, dist) =>
               dist
           }
-          .collect()
         
         val pw = new PrintWriter(rankingsFilename)
-        likelihood.map {
+        distances.map {
           case ((label1, label2), dist) =>
             pw.print(label1)
             pw.print("\t")
