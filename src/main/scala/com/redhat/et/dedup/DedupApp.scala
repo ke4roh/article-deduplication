@@ -186,6 +186,58 @@ object DedupApp {
     }
     pw.close()
   }
+
+  def rankings(workDir : String, rankingsFilename : String, threshold : Double, binarize : Boolean, tfidf : Boolean, normalize : Boolean, jaccard : Boolean, sc : SparkContext) = {
+    val wordCounts = sc.featureMatrix(workDir + "/documents")
+        
+    val binarizedWordCounts = if (binarize) {
+      wordCounts.binarize()
+    } else {
+      wordCounts
+    }
+
+    val scaledWordCounts = if (tfidf) {
+      binarizedWordCounts.tfidf()
+    } else if (normalize) {  
+      binarizedWordCounts.normalizeL2()
+    } else {
+      binarizedWordCounts
+    }
+
+    val labeledVectors = scaledWordCounts.labeledVectors
+      .cache()
+
+    val distances = labeledVectors.cartesian(labeledVectors)
+      .filter {
+        case ((label1, vec1), (label2, vec2)) =>
+          label1 != label2 && label1.toInt < label2.toInt 
+      }
+      .map {
+        case ((label1, vec1), (label2, vec2)) =>
+          val dist = DedupFunctions.distance(vec1, vec2, jaccard)
+          ((label1, label2), dist)
+      }
+      .filter {
+        case (labels, dist) =>
+          dist < threshold
+      }
+      .collect()
+      .sortBy { 
+        case (labels, dist) =>
+          dist
+      }
+        
+    val pw = new PrintWriter(workDir + "/" + rankingsFilename)
+    distances.map {
+      case ((label1, label2), dist) =>
+        pw.print(label1)
+        pw.print("\t")
+        pw.print(label2)
+        pw.print("\t")
+        pw.println(dist)
+    }
+    pw.close()
+  }
   
   def main(args: Array[String]) {
     val parser = new Conf(args)
@@ -242,6 +294,13 @@ object DedupApp {
 
         histogram(workDir, histogramFilename, mode.binWidth(), mode.binarize(),
                   mode.tfidf(), mode.normalize(), mode.jaccard(), sc)
+
+      case parser.rankingsMode =>
+        val mode = parser.rankingsMode
+
+        val rankingsFilename = mode.rankingsFile()
+
+        rankings(workDir, rankingsFilename, mode.threshold(), mode.binarize(), mode.tfidf(), mode.normalize(), mode.jaccard(), sc)
 
       case parser.annMode =>
         val mode = parser.annMode
@@ -324,62 +383,7 @@ object DedupApp {
         println("Precision: " + prec)
         println("Recall: " + recall)
 
-      case parser.rankingsMode =>
-        val mode = parser.rankingsMode
-
-        val jaccard = mode.jaccard()
-        val rankingsFilename = mode.rankingsFile()
-        val threshold = mode.threshold()
-
-        val wordCounts = sc.featureMatrix(workDir + "/documents")
-        
-        val binarizedWordCounts = if (mode.binarize()) {
-          wordCounts.binarize()
-        } else {
-          wordCounts
-        }
-
-        val scaledWordCounts = if (mode.tfidf()) {
-          binarizedWordCounts.tfidf()
-        } else if (mode.normalize()) {
-          binarizedWordCounts.normalizeL2()
-        } else {
-          binarizedWordCounts
-        }
-
-        val labeledVectors = scaledWordCounts.labeledVectors
-          .cache()
-
-        val distances = labeledVectors.cartesian(labeledVectors)
-          .filter {
-            case ((label1, vec1), (label2, vec2)) =>
-              label1 != label2 && label1.toInt < label2.toInt 
-          }
-          .map {
-            case ((label1, vec1), (label2, vec2)) =>
-              val dist = DedupFunctions.distance(vec1, vec2, jaccard)
-              ((label1, label2), dist)
-          }
-          .filter {
-            case (labels, dist) =>
-              dist < threshold
-          }
-          .collect()
-          .sortBy { 
-            case (labels, dist) =>
-              dist
-          }
-        
-        val pw = new PrintWriter(workDir + "/" + rankingsFilename)
-        distances.map {
-          case ((label1, label2), dist) =>
-            pw.print(label1)
-            pw.print("\t")
-            pw.print(label2)
-            pw.print("\t")
-            pw.println(dist)
-        }
-        pw.close()
+       
 
       case _ =>
         System.out.println("Need to specify a mode.")

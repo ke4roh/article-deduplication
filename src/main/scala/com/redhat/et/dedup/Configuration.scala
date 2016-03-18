@@ -14,7 +14,7 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
     val windowSize = opt[Int](default = Some(1))
   }
 
-  val likelihoodMode = new Subcommand("compute-likelihood") {
+  val likelihoodMode = new Subcommand("likelihood") {
     val binWidth = opt[Double](default = Some(0.05))
     val likelihoodFile = opt[String](required = true)
     val duplicateSets = opt[String](required = true)
@@ -25,9 +25,9 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
     mutuallyExclusive(tfidf, normalize)
   }
 
-  val rankingsMode = new Subcommand("rankings") {
-    val rankingsFile = opt[String](required = true)
-    val threshold = opt[Double](default = Some(0.2))
+  val histogramMode = new Subcommand("histogram") {
+    val binWidth = opt[Double](default = Some(0.05))
+    val histogramFile = opt[String](required = true)
     val binarize = opt[Boolean]()
     val tfidf = opt[Boolean]()
     val normalize = opt[Boolean]()
@@ -35,7 +35,7 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
     mutuallyExclusive(tfidf, normalize)
   }
 
-  val approxRankingsMode = new Subcommand("approx-rankings") {
+  val rankingsMode = new Subcommand("rankings") {
     val rankingsFile = opt[String](required = true)
     val threshold = opt[Double](default = Some(0.2))
     val binarize = opt[Boolean]()
