@@ -59,10 +59,14 @@ object TextCleanerFunctions {
           .map { shingle => shingle.mkString(",") }
           .toSeq
       }
-      // HACK for filtering out test solutions.
+      // HACK for filtering out test and retired solutions.
       .filter {
         case (articleId, words) =>
-          ! (words.size < 10 && words.contains("test"))
+          ! (words.size < 20 && words.contains("test"))
+      }
+      .filter {
+        case (articleId, words) =>
+          ! (words.size < 20 && words.contains("retired"))
       }
 
     cleaned.cache()
