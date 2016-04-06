@@ -41,25 +41,32 @@ object TextCleanerFunctions {
       }
 
     val replaceWordsBC = sc.broadcast(replacementWords)
-    val cleaned = rdd.map {
-      case (articleId, text) =>
+    val cleaned = rdd.mapValues {
+      case text =>
         val replaceWords = replaceWordsBC.value
-        (articleId,
-         text.trim()
-           .toLowerCase()
-           .split(Array(' ', '\t'))
-           .map ( w => w.stripPrefix("'").stripSuffix("'") )
-           .filter( s => s.length != 0 )
-           .map ( w => replaceWords.getOrElse(w, w) )
-           .filter( s => !filteredWords.contains(s) )
-           .filter( s => Try(s.toUpperCase.toLong).isFailure )
-           .filter( s => Try(java.lang.Long.parseLong(s.toUpperCase, 16)).isFailure)
-           .filter( s => !s.startsWith("0x") )
-           .filter( s => !s.startsWith("ffff") )
-           .sliding( windowSize )
-           .map { shingle => shingle.mkString(",") }
-           .toSeq
-         )
+        text.trim()
+          .toLowerCase()
+          .split(Array(' ', '\t'))
+          .map ( w => w.stripPrefix("'").stripSuffix("'") )
+          .filter( s => s.length != 0 )
+          .map ( w => replaceWords.getOrElse(w, w) )
+          .filter( s => !filteredWords.contains(s) )
+          .filter( s => Try(s.toUpperCase.toLong).isFailure )
+          .filter( s => Try(java.lang.Long.parseLong(s.toUpperCase, 16)).isFailure)
+          .filter( s => !s.startsWith("0x") )
+          .filter( s => !s.startsWith("ffff") )
+          .sliding( windowSize )
+          .map { shingle => shingle.mkString(",") }
+          .toSeq
+      }
+      // HACK for filtering out test and retired solutions.
+      .filter {
+        case (articleId, words) =>
+          ! (words.size < 20 && words.contains("test"))
+      }
+      .filter {
+        case (articleId, words) =>
+          ! (words.size < 20 && words.contains("retired"))
       }
 
     cleaned.cache()
