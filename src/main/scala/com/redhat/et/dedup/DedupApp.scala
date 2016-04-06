@@ -14,8 +14,6 @@ import org.apache.spark.mllib.linalg.{Vectors, SparseVector}
 
 import com.redhat.et.dedup.FeatureMatrixSparkContext.implicits._
 
-import com.github.karlhigley.spark.neighbors.ANN
-
 import java.io._
 import java.nio.file._
 
@@ -289,73 +287,6 @@ object DedupApp {
         val scaledWordCounts = getWordCounts(workDir, mode.binarize(), mode.tfidf(), mode.normalize(), sc)
 
         rankings(workDir, scaledWordCounts, rankingsFilename, mode.threshold(), mode.jaccard())
-
-      case parser.annMode =>
-        val mode = parser.annMode
-        
-        val duplicatesFilename = mode.duplicateSets() 
-        val duplicateSets = IOFuncs.readDuplicateSets(duplicatesFilename)
-
-        val scaledWordCounts = getWordCounts(workDir, mode.binarize(), mode.tfidf(), mode.normalize(), sc)
-
-        val duplicatePairs = duplicateSets.flatMap {
-          case duplicateSet =>
-            duplicateSet.combinations(2)
-              .map(_.toSet)
-          }
-          .toSet
-
-        val duplicatePairsBC = sc.broadcast(duplicatePairs)
-
-        val nDim = scaledWordCounts.nCols
-
-        val indexedVec = scaledWordCounts.labeledVectors
-          .repartition(sc.defaultParallelism)
-          .zipWithUniqueId
-
-        val relabeledVectors = indexedVec.map {
-          case ((label, vec), id) =>
-            (id.toInt, vec)
-        }
-
-        val labelIds = indexedVec.map {
-          case ((label, vec), id) =>
-            (id.toInt, label)
-        }
-        .collectAsMap
-
-        val labelIdsBC = sc.broadcast(labelIds)
-
-        val annModel = new ANN(dimensions = nDim,
-                               measure = "jaccard")
-                                 .setTables(4)
-                                 .setSignatureLength(128)
-                                  // needs to be larger than dimensions according to docs
-                                 .setPrimeModulus(15485863)
-                                 .setBands(16)
-                                 .train(relabeledVectors)
-
-        val neighbors = annModel.neighbors(10)
-          .flatMap {
-            case (source, iter) =>
-              iter.map {
-                 case (target, dist) =>
-                   val labelIds = labelIdsBC.value
-                   val pair = Set(labelIds(source), labelIds(target))
-                   (duplicatePairsBC.value.contains(pair), 1)
-              }
-          }
-          .reduceByKey(_ + _)
-          .collectAsMap()
-
-        val prec = neighbors(true).toDouble /
-          (neighbors(true).toDouble + neighbors(false).toDouble)
-
-        val recall = neighbors(true).toDouble / labelIds.size
-
-        println(neighbors)
-        println("Precision: " + prec)
-        println("Recall: " + recall)
 
       case _ =>
         System.out.println("Need to specify a mode.")

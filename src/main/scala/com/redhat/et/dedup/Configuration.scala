@@ -41,12 +41,4 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
     val normalize = opt[Boolean]()
     val jaccard = opt[Boolean]()
   }
-
-  val annMode = new Subcommand("ann") {
-    val duplicateSets = opt[String](required = true)
-    val binarize = opt[Boolean]()
-    val tfidf = opt[Boolean]()
-    val normalize = opt[Boolean]()
-    val jaccard = opt[Boolean]()
-  }
 }
