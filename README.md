@@ -22,7 +22,7 @@ Create a directory called `workdir` for intermediate files.
     --class com.redhat.et.DedupApp
     target/scala_2.1.0/dedup-assembly-0.1.jar \
     import-data \
-    --workdir workdir \
+    --work-dir workdir \
     --articles /path/to/article.json \
     --filter-words /path/to/filter-words.txt \
     --replacement /path/to/replacement-words.txt \
@@ -37,6 +37,7 @@ Histogram document pairs based on distances.  The histogram may appear bimodal, 
     --driver-memory 200G \
     --class com.redhat.et.DedupApp
     target/scala_2.1.0/dedup-assembly-0.1.jar \
+    --work-dir workdir \
     histogram \
     --bin-width 0.05
     --histogram-file histogram.txt \
@@ -50,6 +51,7 @@ Predict duplicate pairs:
     --driver-memory 200G \
     --class com.redhat.et.DedupApp
     target/scala_2.1.0/dedup-assembly-0.1.jar \
+    --work-dir workdir \
     rankings \
     --rankings-file rankings.txt \
     --tfidf \
