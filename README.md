@@ -25,7 +25,7 @@ Create a directory called `workdir` for intermediate files.
     --work-dir workdir \
     --articles /path/to/article.json \
     --filter-words /path/to/filter-words.txt \
-    --replacement /path/to/replacement-words.txt \
+    --replacement-words /path/to/replacement-words.txt \
     --min-word-count 5
 
 
