@@ -21,8 +21,8 @@ Create a directory called `workdir` for intermediate files.
     --driver-memory 200G \
     --class com.redhat.et.DedupApp
     target/scala_2.1.0/dedup-assembly-0.1.jar \
-    import-data \
     --work-dir workdir \
+    import-data \
     --articles /path/to/article.json \
     --filter-words /path/to/filter-words.txt \
     --replacement-words /path/to/replacement-words.txt \
