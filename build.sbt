@@ -4,7 +4,7 @@ version := "0.1"
 
 val SPARK_VERSION = "1.6.0"
 
-scalaVersion := "2.10.4"
+scalaVersion := "2.10.5"
 
 resolvers ++= Seq(
   "sonatype snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
