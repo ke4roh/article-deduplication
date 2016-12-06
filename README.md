@@ -8,7 +8,7 @@ Currently, the repository is missing example articles as well as examples of the
 
 Build:
 
-    $ sbt assembly
+    $ ./sbt assembly
 
 A jar (`dedup-assembly-0.1.jar`) will be created under `target/scala_2.10`.
 
