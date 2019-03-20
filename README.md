@@ -10,7 +10,7 @@ Build:
 
     $ ./sbt assembly
 
-A jar (`dedup-assembly-0.1.jar`) will be created under `target/scala_2.10`.
+A jar (`dedup-assembly-0.1.jar`) will be created under `target/scala_2.11`.
 
 Import data:
 
