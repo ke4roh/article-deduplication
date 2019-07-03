@@ -19,7 +19,7 @@ Create a directory called `workdir` for intermediate files.
     $ spark-submit --master local[20] \
     --executor-memory 200G \
     --driver-memory 200G \
-    --class com.redhat.et.DedupApp
+    --class com.redhat.et.dedup.DedupApp
     target/scala_2.11/dedup-assembly-0.1.jar \
     --work-dir workdir \
     import-data \
@@ -35,7 +35,7 @@ Histogram document pairs based on distances.  The histogram may appear bimodal, 
     $ spark-submit --master local[20] \
     --executor-memory 200G \
     --driver-memory 200G \
-    --class com.redhat.et.DedupApp
+    --class com.redhat.et.dedup.DedupApp
     target/scala_2.11/dedup-assembly-0.1.jar \
     --work-dir workdir \
     histogram \
@@ -49,7 +49,7 @@ Predict duplicate pairs:
     $ spark-submit --master local[20] \
     --executor-memory 200G \
     --driver-memory 200G \
-    --class com.redhat.et.DedupApp
+    --class com.redhat.et.dedup.DedupApp
     target/scala_2.11/dedup-assembly-0.1.jar \
     --work-dir workdir \
     rankings \
