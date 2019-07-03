@@ -24,8 +24,8 @@ Create a directory called `workdir` for intermediate files.
     --work-dir workdir \
     import-data \
     --articles /path/to/article.json \
-    --filter-words /path/to/filter-words.txt \
-    --replacement-words /path/to/replacement-words.txt \
+    --filter-words /path/to/filter-words.json \
+    --replacement-words /path/to/replacement-words.json \
     --min-word-count 5
 
 
