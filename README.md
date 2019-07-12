@@ -6,11 +6,17 @@ Currently, the repository is missing example articles as well as examples of the
 
 # Instructions
 
+Get Apache Spark - last tested with [2.4.3 (May 07 2019) Pre-build for Apache Hadoop 2.7 and later](https://spark.apache.org/downloads.html)
+
 Build:
 
     $ ./sbt assembly
 
 A jar (`dedup-assembly-0.1.jar`) will be created under `target/scala_2.11`.
+
+Get a stopword list to use:
+
+     wget https://raw.githubusercontent.com/moewe-io/stopwords/master/dist/en/en.json
 
 Import data:
 
@@ -24,7 +30,7 @@ Create a directory called `workdir` for intermediate files.
     --work-dir workdir \
     import-data \
     --articles /path/to/article.json \
-    --filter-words /path/to/filter-words.json \
+    --filter-words en.json \
     --replacement-words /path/to/replacement-words.json \
     --min-word-count 5
 
