@@ -30,46 +30,16 @@ Import data:
 
 Create a directory called `workdir` for intermediate files.
 
-    spark-submit --master "local[20]" \
-    --executor-memory 200G \
-    --driver-memory 200G \
-    --class com.redhat.et.dedup.DedupApp
-    target/scala_2.11/dedup-assembly-0.1.jar \
-    --work-dir workdir \
-    import-data \
-    --articles docs.json \
-    --filter-words en.json \
-    --replacement-words replacement-words.json \
-    --min-word-count 5
+    spark-submit --master "local[*]" --class com.redhat.et.dedup.DedupApp target/scala_2.11/dedup-assembly-0.1.jar --work-dir workdir import-data --articles docs.json --filter-words en.json --replacement-words replacement-words.json --min-word-count 5
 
 
 Compute Histogram:
 Histogram document pairs based on distances.  The histogram may appear bimodal, suggesting a natural threshold for predictions.
 
-    spark-submit --master "local[20]" \
-    --executor-memory 200G \
-    --driver-memory 200G \
-    --class com.redhat.et.dedup.DedupApp
-    target/scala_2.11/dedup-assembly-0.1.jar \
-    --work-dir workdir \
-    histogram \
-    --bin-width 0.05
-    --histogram-file histogram.txt \
-    --tfidf \
-    --normalize
+    spark-submit --master "local[*]" --class com.redhat.et.dedup.DedupApp target/scala_2.11/dedup-assembly-0.1.jar --work-dir workdir histogram --bin-width 0.05 --histogram-file histogram.txt --tfidf --normalize
 
 Predict duplicate pairs:
 
-    spark-submit --master "local[20]" \
-    --executor-memory 200G \
-    --driver-memory 200G \
-    --class com.redhat.et.dedup.DedupApp
-    target/scala_2.11/dedup-assembly-0.1.jar \
-    --work-dir workdir \
-    rankings \
-    --rankings-file rankings.txt \
-    --tfidf \
-    --normalize \
-    --threshold 0.5
-    
-    
+    spark-submit --master "local[*]" --class com.redhat.et.dedup.DedupApp target/scala_2.11/dedup-assembly-0.1.jar --work-dir workdir rankings --rankings-file rankings.txt --tfidf --normalize --threshold 0.5
+
+For large data sets, you may need to add --executor-memory 200G and --driver-memory 200G to the spark-submit lines.
