@@ -18,6 +18,10 @@ Get a stopword list to use:
 
      wget https://raw.githubusercontent.com/moewe-io/stopwords/master/dist/en/en.json
 
+Format the input documents:
+
+     jq -c '.response.docs[] | {article_id: ."solution.id" | tonumber, text: .body | join(" ")}' input.json > docs.json
+
 Import data:
 
 Create a directory called `workdir` for intermediate files.
@@ -29,7 +33,7 @@ Create a directory called `workdir` for intermediate files.
     target/scala_2.11/dedup-assembly-0.1.jar \
     --work-dir workdir \
     import-data \
-    --articles /path/to/article.json \
+    --articles docs.json \
     --filter-words en.json \
     --replacement-words /path/to/replacement-words.json \
     --min-word-count 5
