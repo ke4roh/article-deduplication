@@ -24,7 +24,7 @@ Get a replacement word list to use, a json dict:
 
 Format the input documents:
 
-     jq -c '.response.docs[] | {article_id: ."solution.id" | tonumber, text: .body | join(" ")}' input.json > docs.json
+     jq -c '.[] | {article_id: ."solution.id" | tonumber, text: .body | join(" ")}' input.json > docs.json
 
 Import data:
 
