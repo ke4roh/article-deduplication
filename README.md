@@ -18,6 +18,10 @@ Get a stopword list to use:
 
      wget https://raw.githubusercontent.com/moewe-io/stopwords/master/dist/en/en.json
 
+Get a replacement word list to use, a json dict:
+
+    echo "{}" > replacement-words.json
+
 Format the input documents:
 
      jq -c '.response.docs[] | {article_id: ."solution.id" | tonumber, text: .body | join(" ")}' input.json > docs.json
@@ -35,7 +39,7 @@ Create a directory called `workdir` for intermediate files.
     import-data \
     --articles docs.json \
     --filter-words en.json \
-    --replacement-words /path/to/replacement-words.json \
+    --replacement-words replacement-words.json \
     --min-word-count 5
 
 
