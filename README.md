@@ -30,7 +30,7 @@ Import data:
 
 Create a directory called `workdir` for intermediate files.
 
-    $ spark-submit --master local[20] \
+    spark-submit --master "local[20]" \
     --executor-memory 200G \
     --driver-memory 200G \
     --class com.redhat.et.dedup.DedupApp
@@ -46,7 +46,7 @@ Create a directory called `workdir` for intermediate files.
 Compute Histogram:
 Histogram document pairs based on distances.  The histogram may appear bimodal, suggesting a natural threshold for predictions.
 
-    $ spark-submit --master local[20] \
+    spark-submit --master "local[20]" \
     --executor-memory 200G \
     --driver-memory 200G \
     --class com.redhat.et.dedup.DedupApp
@@ -60,7 +60,7 @@ Histogram document pairs based on distances.  The histogram may appear bimodal, 
 
 Predict duplicate pairs:
 
-    $ spark-submit --master local[20] \
+    spark-submit --master "local[20]" \
     --executor-memory 200G \
     --driver-memory 200G \
     --class com.redhat.et.dedup.DedupApp
