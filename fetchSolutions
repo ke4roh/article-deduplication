@@ -2,6 +2,7 @@
 
 import pysolr
 import json
+from time import sleep
 
 def iter_records(solr, **qparams):
     result = solr.search(**qparams)
@@ -22,6 +23,7 @@ first=True
 for rec in iter_records(solr,
    wt="json",
    q="documentKind:Solution", 
+   fq="caseCount_365:[1 TO *]",
    fl='solution.id,tag,product,accessState,duplicateResourceId,language,body,issue',
    sort='solution.id asc,uri asc',
    cursorMark='*'
@@ -29,5 +31,6 @@ for rec in iter_records(solr,
    first or print(',')
    first=False
    print(json.dumps(rec, indent=4))
+   sleep(.1)
 
 print(']')
