@@ -43,3 +43,8 @@ Predict duplicate pairs:
     spark-submit --master "local[*]" --class com.redhat.et.dedup.DedupApp target/scala-2.11/dedup-assembly-0.1.jar --work-dir workdir rankings --rankings-file rankings.txt --tfidf --normalize --threshold 0.5
 
 For large data sets, you may need to add --executor-memory 200G and --driver-memory 200G to the spark-submit lines.
+
+Print out URLs to compare individual detected pairs:
+
+    perl -e 'while (<>) { chomp; ($a,$b,$d)=split; print "https://dupecheck.usersys.redhat.com/compare?b=$b&a=$a\n"; }' workdir/rankings.txt
+
