@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+
+# auto-detected format
+# 103023	107533	0.0
+
+# human output format
+# A-id,B-id,dupe,sbr,pair-remarks,A-remarks,B-remarks,comparator,score,distance,remaining_score,remaining_to_review,date,pending_resolution
+# 2872,320313,0,,differing in RHEL version,,,jscarbor1@redhat.com,,0.6,,,,False
+
+import csv
+
+# Construct a tuple of x and y, with the smaller number first
+def pairify(x,y):
+    if x < y:
+       return (x,y)
+    else:
+       return (y,x)
+
+gold_pairs=dict()
+# Load in human pairs and store a map of dupiness
+with open('human_results.csv', newline='') as csvfile:
+    reader = csv.DictReader(csvfile)
+    for row in reader:
+        gold_pairs[pairify(row['A-id'],row['B-id'])]=row['dupe']
+
+# Review detetected pairs and see how we did
+score=0
+known_pairs=0
+with open('rankings.txt', newline='') as csvfile:
+    reader = csv.reader(csvfile, delimiter='\t')
+    for row in reader:
+        pair = pairify(*row[0:2])
+        if pair in gold_pairs:
+            known_pairs+=1
+            if gold_pairs[pair]:
+               score+=1
+            else:
+               score-=1
+
+print("known pairs %d\nscore = %d" % (known_pairs, score))

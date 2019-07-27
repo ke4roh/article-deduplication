@@ -23,6 +23,7 @@ first=True
 for rec in iter_records(solr,
    wt="json",
    q="documentKind:Solution", 
+   # fq=["caseCount_365:[1 TO *]","lastModifiedDate:[NOW-2MONTHS TO NOW]"],
    fq="caseCount_365:[1 TO *]",
    fl='solution.id,tag,product,accessState,duplicateResourceId,language,body,issue',
    sort='solution.id asc,uri asc',
